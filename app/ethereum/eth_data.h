@@ -160,6 +160,16 @@ typedef struct {
 } eth_safe_tx_t;
 
 const eth_abi_function_t* eth_data_recognize(const uint8_t* data, uint32_t data_len, bool has_value);
+/* Destination and execution context for formats whose semantics depend on the
+ * target contract. caller is the Safe for SafeTx delegatecalls. */
+typedef struct {
+  const uint8_t* to;
+  const uint8_t* caller;
+  uint8_t operation;
+} eth_data_context_t;
+
+void eth_data_format_with_context(const eth_abi_function_t* abi, const uint8_t* data, size_t data_len,
+    uint8_t* out, size_t out_cap, size_t* out_len, const eth_data_context_t* context);
 void eth_data_format(const eth_abi_function_t* abi, const uint8_t* data, size_t data_len, uint8_t* out, size_t out_cap, size_t* out_len);
 void eth_data_hash(const uint8_t* data, size_t data_len, uint8_t out[SHA3_256_DIGEST_LENGTH]);
 eip712_data_type_t eip712_recognize(const eip712_ctx_t* ctx);

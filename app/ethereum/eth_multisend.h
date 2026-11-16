@@ -4,6 +4,14 @@
 #include <stdint.h>
 
 typedef enum {
+  ETH_MULTISEND_NONE, ETH_MULTISEND_V130, ETH_MULTISEND_CALL_ONLY_V130,
+  ETH_MULTISEND_V141, ETH_MULTISEND_CALL_ONLY_V141,
+  ETH_MULTISEND_V150, ETH_MULTISEND_CALL_ONLY_V150
+} eth_multisend_variant_t;
+
+eth_multisend_variant_t eth_multisend_classify(const uint8_t to[20]);
+
+typedef enum {
   ETH_MULTISEND_COMPLETE, ETH_MULTISEND_MALFORMED,
   ETH_MULTISEND_EMPTY
 } eth_multisend_result_t;

@@ -121,15 +121,56 @@ static void formatting(void) {
   TEST_ASSERT_EQUAL(ERR_OK, fs_write(&abi.entry, sizeof(abi)));
   const eth_abi_function_t* found = eth_data_recognize(encoded, encoded_len, false);
   TEST_ASSERT_NOT_NULL(found);
+  const uint8_t target[20] = {0x38,0x86,0x9b,0xf6,0x6a,0x61,0xcf,0x6b,0xdb,0x99,0x6a,0x6a,0xe4,0x0d,0x58,0x53,0xfd,0x43,0xb5,0x26};
+  const uint8_t target150[20] = {0x21,0x85,0x43,0x28,0x80,0x04,0xcd,0x07,0x83,0x24,0x72,0xd4,0x64,0x64,0x81,0x73,0xc7,0x7d,0x7e,0xb7};
+  const uint8_t callonly150[20] = {0xa8,0x3c,0x33,0x6b,0x20,0x40,0x1a,0xf7,0x73,0xb6,0x21,0x9b,0xa5,0x02,0x71,0x74,0x33,0x8d,0x18,0x36};
+  const uint8_t caller[20] = {0x33};
+  eth_data_context_t context = {.to = target, .caller = caller, .operation = 1};
   eth_data_format(found, encoded, encoded_len, out, sizeof(out), &out_len);
+  TEST_ASSERT_NULL(strstr((char*)out, "Call 1/2")); /* Missing context is opaque. */
+  eth_data_format_with_context(found, encoded, encoded_len, out, sizeof(out), &out_len, &context);
   TEST_ASSERT_NOT_NULL(strstr((char*)out, "Call 1/2"));
   TEST_ASSERT_NOT_NULL(strstr((char*)out, "Call 2/2"));
   TEST_ASSERT_EQUAL_HEX8('b', out[out_len - 1]); /* No trailing blank pages. */
+  context.to = caller;
+  eth_data_format_with_context(found, encoded, encoded_len, out, sizeof(out), &out_len, &context);
+  TEST_ASSERT_NULL(strstr((char*)out, "Call 1/2")); /* ABI alone does not bind a target. */
+  context.to = target;
+  context.operation = 0;
+  eth_data_format_with_context(found, encoded, encoded_len, out, sizeof(out), &out_len, &context);
+  TEST_ASSERT_NULL(strstr((char*)out, "Call 1/2")); /* MultiSend requires delegatecall. */
+  context.operation = 1;
+  /* Payable recognition must also allow the batch expansion. */
+  found = eth_data_recognize(encoded, encoded_len, true);
+  TEST_ASSERT_NOT_NULL(found);
+  eth_data_format_with_context(found, encoded, encoded_len, out, sizeof(out), &out_len, &context);
+  TEST_ASSERT_NOT_NULL(strstr((char*)out, "Call 1/2"));
+  memset(encoded + 69, 0, 20);
+  eth_data_format_with_context(found, encoded, encoded_len, out, sizeof(out), &out_len, &context);
+  TEST_ASSERT_NOT_NULL(strstr((char*)out, "To: 0x0000000000000000000000000000000000000000"));
+  context.to = target150;
+  eth_data_format_with_context(found, encoded, encoded_len, out, sizeof(out), &out_len, &context);
+  TEST_ASSERT_NOT_NULL(strstr((char*)out, "To: 0x3300000000000000000000000000000000000000"));
+  context.caller = NULL;
+  eth_data_format_with_context(found, encoded, encoded_len, out, sizeof(out), &out_len, &context);
+  TEST_ASSERT_NULL(strstr((char*)out, "Call 1/2"));
+  context.to = callonly150;
+  context.operation = 0;
+  eth_data_format_with_context(found, encoded, encoded_len, out, sizeof(out), &out_len, &context);
+  TEST_ASSERT_NOT_NULL(strstr((char*)out, "To: 0xa83c336b20401af773b6219ba5027174338d1836"));
+  encoded[68 + 86] = 1;
+  eth_data_format_with_context(found, encoded, encoded_len, out, sizeof(out), &out_len, &context);
+  TEST_ASSERT_NULL(strstr((char*)out, "Call 1/2")); /* CallOnly forbids inner delegatecall. */
+  context.to = target150;
+  context.caller = caller;
+  context.operation = 1;
+  eth_data_format_with_context(found, encoded, encoded_len, out, sizeof(out), &out_len, &context);
+  TEST_ASSERT_NOT_NULL(strstr((char*)out, "Warning: nested delegatecall"));
   /* A malformed last record must discard the valid first call's expansion. */
   encoded[68 + 86] = 2;
-  eth_data_format(found, encoded, encoded_len, out, sizeof(out), &out_len);
+  eth_data_format_with_context(found, encoded, encoded_len, out, sizeof(out), &out_len, &context);
   TEST_ASSERT_NULL(strstr((char*)out, "Call 1/2"));
-  eth_data_format(found, encoded, encoded_len, out, 4, &out_len);
+  eth_data_format_with_context(found, encoded, encoded_len, out, 4, &out_len, &context);
   TEST_ASSERT_EQUAL(0, out_len);
 }
 
